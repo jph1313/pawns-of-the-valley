@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Pawns of the Valley</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #e9e6df;
+      background: radial-gradient(ellipse 120% 95% at 50% 32%, #2b3340 0%, #1a1e26 55%, #0f1116 100%);
+    }
+    #scene { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+
+    #hud {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      background: rgba(20, 22, 28, 0.72); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px;
+      padding: 14px 16px; width: 268px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+    }
+    #hud h1 { margin: 0 0 10px; font-size: 17px; letter-spacing: 0.3px; color: #f1e7cf; }
+    .turn {
+      font-size: 15px; font-weight: 700; padding: 7px 10px; border-radius: 8px;
+      margin-bottom: 10px; transition: background 0.25s, color 0.25s;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    body.turn-white .turn { background: #efe6cf; color: #2b2723; }
+    body.turn-black .turn { background: #2b2723; color: #efe6cf; border: 1px solid #555; }
+    .scores { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+    .score { font-size: 13px; display: flex; align-items: center; gap: 7px; }
+    .score .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+    .score.white .dot { background: #efe6cf; }
+    .score.black .dot { background: #2b2723; border: 1px solid #777; }
+    .score b { margin-left: 4px; }
+    .status { font-size: 12.5px; color: #9fd6b0; min-height: 16px; margin-bottom: 2px; }
+    .hint { font-size: 12px; color: #e8b04f; min-height: 14px; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    button {
+      font: inherit; font-size: 12.5px; cursor: pointer;
+      background: #3a4150; color: #eef1f6; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 7px 11px; transition: background 0.15s;
+    }
+    button:hover { background: #4a5364; }
+
+    #loaderr {
+      position: fixed; inset: 0; z-index: 30; display: none;
+      align-items: center; justify-content: center; padding: 24px;
+      background: #1a1d24; text-align: center;
+    }
+    #loaderr.show { display: flex; }
+    #loaderr div { max-width: 460px; line-height: 1.5; }
+
+    #help {
+      position: fixed; inset: 0; z-index: 20; display: flex;
+      align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55);
+    }
+    #help.hidden { display: none; }
+    .help-card {
+      background: #20242d; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+      padding: 22px 26px 24px; max-width: 540px; max-height: 86vh; overflow-y: auto;
+      box-shadow: 0 16px 50px rgba(0,0,0,0.55);
+    }
+    .help-card h2 { margin: 0 0 2px; color: #f1e7cf; font-size: 20px; }
+    .help-tag { margin: 0 0 16px; color: #98a1b0; font-size: 13px; }
+    .help-sec { margin-bottom: 13px; }
+    .help-sec h3 { margin: 0 0 3px; font-size: 13px; color: #e8c98a; letter-spacing: 0.3px; text-transform: uppercase; }
+    .help-sec p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #d7d2c8; }
+    .help-card b { color: #f1ece0; }
+    .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; margin: 0 2px; }
+    .chip.g { background: rgba(54,214,107,0.18); color: #54de86; }
+    .chip.r { background: rgba(232,72,63,0.20); color: #ff6a61; }
+    #help .help-card button { margin-top: 6px; width: 100%; padding: 9px; font-weight: 700; background: #3a4150; }
+    #help .help-card button:hover { background: #4a5364; }
+
+    /* Setup phase */
+    body.setup-phase #hud, body.setup-phase #movelist { display: none; }
+    #setup { position: fixed; top: 16px; left: 16px; z-index: 15; }
+    #setup.hidden { display: none; }
+    .setup-bar {
+      background: rgba(20, 22, 28, 0.84); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+      padding: 12px 18px; text-align: center; box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    }
+    #setup-title { font-size: 16px; font-weight: 800; color: #f1e7cf; margin-bottom: 3px; }
+    #setup-count { font-size: 13px; color: #9fd6b0; margin-bottom: 9px; }
+    .setup-btns { display: flex; gap: 7px; justify-content: center; }
+    .setup-hint { font-size: 11.5px; color: #8b93a3; margin-top: 9px; max-width: 320px; }
+    #su-ready { background: #2e7d46; }
+    #su-ready:hover { background: #379a55; }
+
+    #handoff { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #11131a; }
+    #handoff.hidden { display: none; }
+    .handoff-card { text-align: center; }
+    #handoff-msg { font-size: 27px; font-weight: 800; color: #f1e7cf; margin-bottom: 8px; }
+    #handoff-sub { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; }
+
+    button:disabled { opacity: 0.4; cursor: default; }
+
+    /* Move list */
+    #movelist {
+      position: fixed; top: 16px; right: 16px; z-index: 10; width: 168px;
+      background: rgba(20, 22, 28, 0.72); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+      padding: 10px 12px; box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+    }
+    #movelist h2 { margin: 0 0 6px; font-size: 12px; color: #c9bda0; letter-spacing: 0.5px; text-transform: uppercase; }
+    #moves { list-style: none; margin: 0; padding: 0; max-height: 38vh; overflow-y: auto; font-variant-numeric: tabular-nums; }
+    #moves li { font-size: 12.5px; padding: 2px 4px; border-radius: 5px; display: flex; align-items: center; gap: 7px; }
+    #moves li:nth-child(odd) { background: rgba(255,255,255,0.04); }
+    #moves .n { color: #7c8596; width: 20px; text-align: right; }
+    #moves .pc { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+    #moves .pc.W { background: #efe6cf; }
+    #moves .pc.B { background: #161310; border: 1px solid #777; }
+    #moves .empty { color: #6b7382; font-size: 12px; padding: 2px 4px; }
+
+    /* View + sound bar */
+    #viewbar {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+      display: flex; gap: 7px; background: rgba(20,22,28,0.72); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 7px 9px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+    }
+    #viewbar button.active { background: #5b6b86; }
+
+    /* Win overlay + confetti */
+    #winover { position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    #winover.hidden { display: none; }
+    .win-card {
+      pointer-events: auto; text-align: center; padding: 30px 44px; border-radius: 18px;
+      background: rgba(24,27,34,0.92); border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6); animation: pop 0.4s ease;
+    }
+    @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    #win-msg { font-size: 30px; font-weight: 800; margin-bottom: 8px; color: #f1e7cf; }
+    #win-detail { font-size: 13.5px; color: #aeb6c4; margin-bottom: 18px; line-height: 1.5; }
+    #confetti { position: fixed; inset: 0; z-index: 24; overflow: hidden; pointer-events: none; }
+    .confetti-piece {
+      position: absolute; top: -16px; width: 9px; height: 14px; opacity: 0.95;
+      animation: fall linear forwards;
+    }
+    @keyframes fall {
+      to { transform: translateY(105vh) rotate(720deg); opacity: 0.9; }
+    }
+
+    /* ---- Phone / narrow screens ---- */
+    @media (max-width: 720px) {
+      #hud { width: 200px; padding: 10px 11px; border-radius: 12px; }
+      #hud h1 { font-size: 14px; margin-bottom: 7px; }
+      .turn { font-size: 13px; padding: 6px 8px; margin-bottom: 7px; }
+      .score { font-size: 12px; }
+      .status, .hint { font-size: 11px; }
+      #movelist { display: none; }                 /* secondary panel hidden on phones */
+      .buttons { gap: 6px; margin-top: 8px; }
+      button { padding: 9px 11px; font-size: 13px; } /* larger tap targets */
+
+      #setup { left: 8px; right: 8px; }
+      .setup-bar { padding: 10px 12px; }
+      #setup-title { font-size: 14px; }
+      .setup-btns { flex-wrap: wrap; }
+      .setup-hint { font-size: 11px; max-width: none; }
+
+      #viewbar { bottom: 10px; padding: 6px 8px; gap: 6px; }
+      #viewbar button { padding: 9px 12px; }
+
+      .help-card { padding: 18px 18px 20px; max-width: 92vw; max-height: 88vh; }
+      .help-card h2 { font-size: 18px; }
+      .help-sec p, .help-tag { font-size: 13px; }
+      .win-card { padding: 24px 22px; max-width: 88vw; }
+      #win-msg { font-size: 24px; }
+      #handoff-msg { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="hud">
+    <h1>Pawns of the Valley</h1>
+    <div id="turn" class="turn">White to move</div>
+    <div class="scores">
+      <div class="score white"><span class="dot"></span>White delivered: <b id="scoreW">0/4</b></div>
+      <div class="score black"><span class="dot"></span>Black delivered: <b id="scoreB">0/4</b></div>
+    </div>
+    <div id="status" class="status"></div>
+    <div id="hint" class="hint"></div>
+    <div class="buttons">
+      <button id="btn-new">New game</button>
+      <button id="btn-undo">Undo</button>
+      <button id="btn-mode">Mode: 2 Players</button>
+      <button id="btn-help">How to play</button>
+    </div>
+  </div>
+
+  <div id="movelist">
+    <h2>Moves</h2>
+    <ol id="moves"><li class="empty">No moves yet.</li></ol>
+  </div>
+
+  <div id="setup" class="hidden">
+    <div class="setup-bar">
+      <div id="setup-title">White: place your pawns</div>
+      <div id="setup-count">Placed 8 / 8</div>
+      <div class="setup-btns" style="margin-bottom:7px;">
+        <button id="su-mode">Opponent: 2 Players</button>
+      </div>
+      <div class="setup-btns">
+        <button id="su-standard">Standard</button>
+        <button id="su-random">Random</button>
+        <button id="su-clear">Clear</button>
+        <button id="su-undo">Undo</button>
+        <button id="su-ready">Ready</button>
+      </div>
+      <div class="setup-hint"><b>Click</b> your glowing squares to place all 8 pawns (stack freely) · <b>right-click</b> or Undo to remove · or hit <b>Standard</b> for the default · drag to orbit.</div>
+    </div>
+  </div>
+
+  <div id="handoff" class="hidden">
+    <div class="handoff-card">
+      <div id="handoff-msg">Pass the device to Black</div>
+      <div id="handoff-sub">(so they can't see your formation)</div>
+      <button id="handoff-go">I'm Black — let me set up</button>
+    </div>
+  </div>
+
+  <div id="viewbar">
+    <button data-view="angle" class="active">3D</button>
+    <button data-view="top">Top</button>
+    <button data-view="side">Side</button>
+    <button id="btn-mute" title="Toggle sound">🔊</button>
+    <button id="btn-help2" title="How to play">?</button>
+  </div>
+
+  <div id="confetti"></div>
+  <div id="winover" class="hidden">
+    <div class="win-card">
+      <div id="win-msg"></div>
+      <div id="win-detail"></div>
+      <button id="win-again">Play again</button>
+    </div>
+  </div>
+
+  <div id="help" class="hidden">
+    <div class="help-card">
+      <h2>Pawns of the Valley</h2>
+      <p class="help-tag">March your pawns across the valley and into the enemy camp.</p>
+
+      <div class="help-sec"><h3>Goal</h3>
+        <p>Get pawns into <b>either of your opponent's two home rows</b> (the glowing camp). Every pawn there scores — <b>stacks count too</b>. Fill their <b>back row</b> (all 4 squares) for an instant win; otherwise the <b>most pawns delivered</b> wins once no moves remain — ties go to <b>most captures</b>.</p></div>
+
+      <div class="help-sec"><h3>Setup</h3>
+        <p>Each game opens with a <b>secret deployment</b>. Place your 8 pawns anywhere in your two home rows: <b>click</b> a glowing square to drop one and <b>stack freely</b>; <b>right-click</b> or <b>Undo</b> to remove; <b>Standard</b> fills the classic line. Both sides commit privately, then reveal.</p></div>
+
+      <div class="help-sec"><h3>Moving</h3>
+        <p>Pawns move like chess pawns — <b>forward one</b> square, or <b>two</b> from their second row. They walk <b>down into the valley</b> freely.</p></div>
+
+      <div class="help-sec"><h3>Climbing &amp; the valley</h3>
+        <p>Climb <b>straight forward</b> onto a pawn or stack of any height, but only <b>one level higher</b> than you stand. You <b>can't scale the valley wall</b> directly — to reach the far side, climb onto a pawn at the valley's edge, then step across. Only the <b>top</b> pawn of a stack can move; the one beneath is stuck until it leaves.</p></div>
+
+      <div class="help-sec"><h3>Capturing</h3>
+        <p>Capture <b>diagonally forward</b> onto an enemy on your <b>level or anywhere below</b> (downhill) — never uphill. The captured pawn is removed.</p></div>
+
+      <div class="help-sec"><h3>Controls</h3>
+        <p>Click a pawn, then a highlight — <span class="chip g">green: move / climb</span><span class="chip r">red: capture</span> (or click the red-ringed enemy directly). <b>Drag</b> to orbit, <b>scroll</b> to zoom, and switch <b>3D / Top / Side</b> views below. New game, Undo, and mute sit in the panel; your game auto-saves.</p></div>
+
+      <button id="btn-close-help">Got it</button>
+    </div>
+  </div>
+
+  <div id="loaderr"><div></div></div>
+
+  <!-- Three.js (classic global build) + OrbitControls. Classic scripts load fine
+       even when this file is opened directly from disk (file://). -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    // If the 3D library failed to load (e.g. no internet), tell the user instead
+    // of silently showing dead buttons.
+    if (typeof THREE === 'undefined') {
+      var le = document.getElementById('loaderr');
+      le.firstElementChild.innerHTML =
+        "<h2>Couldn't load the 3D engine.</h2><p>This game loads the Three.js " +
+        "library from the internet. Check your connection and reload the page.</p>";
+      le.classList.add('show');
+      return;
+    }
+
+    // ====================================================================
+    // GAME LOGIC  (pure, no rendering)
+    // ====================================================================
+    var ROWS = 7, COLS = 4, WHITE = 'W', BLACK = 'B';
+    var isTopRow = function (r) { return r <= 1 || r >= 5; };          // rows 0,1,5,6
+    var groundLevel = function (r) { return isTopRow(r) ? 1 : 0; };    // valley floor = 0
+    var other = function (p) { return p === WHITE ? BLACK : WHITE; };
+    var dirOf = function (p) { return p === WHITE ? 1 : -1; };
+    var secondRowOf = function (p) { return p === WHITE ? 1 : 5; };
+    var scoreRowOf = function (p) { return p === WHITE ? 6 : 0; };          // opponent's back row (for instant win)
+    var scoreRowsOf = function (p) { return p === WHITE ? [5, 6] : [0, 1]; }; // BOTH opponent home rows (for scoring)
+    var inBounds = function (r, c) { return r >= 0 && r < ROWS && c >= 0 && c < COLS; };
+
+    function createInitialState() {
+      var board = [];
+      for (var r = 0; r < ROWS; r++) { board[r] = []; for (var c = 0; c < COLS; c++) board[r][c] = []; }
+      var id = 1;
+      for (var cc = 0; cc < COLS; cc++) {
+        board[0][cc].push({ color: WHITE, id: id++ });
+        board[1][cc].push({ color: WHITE, id: id++ });
+        board[5][cc].push({ color: BLACK, id: id++ });
+        board[6][cc].push({ color: BLACK, id: id++ });
+      }
+      return { board: board, current: WHITE, winner: null, over: false, lastSkipped: null, caps: { W: 0, B: 0 } };
+    }
+
+    function cloneState(s) {
+      var caps = s.caps || { W: 0, B: 0 };
+      return {
+        board: s.board.map(function (row) {
+          return row.map(function (stack) { return stack.map(function (p) { return { color: p.color, id: p.id }; }); });
+        }),
+        current: s.current, winner: s.winner, over: s.over, lastSkipped: s.lastSkipped,
+        caps: { W: caps.W, B: caps.B }
+      };
+    }
+    var stackAt = function (s, r, c) { return s.board[r][c]; };
+    var topPiece = function (s, r, c) { var st = s.board[r][c]; return st.length ? st[st.length - 1] : null; };
+
+    // move = { from:{r,c}, to:{r,c}, type:'move'|'double'|'climb'|'capture', captureId? }
+    function generateMoves(s, r, c) {
+      var stack = stackAt(s, r, c);
+      if (!stack.length) return [];
+      var piece = stack[stack.length - 1];
+      var player = piece.color;
+      if (player !== s.current) return [];
+
+      var dir = dirOf(player);
+      var feet = groundLevel(r) + (stack.length - 1);
+      var moves = [];
+
+      // straight forward one (never captures)
+      var fr = r + dir;
+      if (inBounds(fr, c)) {
+        var tc = stackAt(s, fr, c).length;
+        if (tc === 0) {
+          if (groundLevel(fr) - feet <= 0) moves.push({ from: { r: r, c: c }, to: { r: fr, c: c }, type: 'move' });
+        } else {
+          // Climb onto a stack of ANY height, but rise at most one level.
+          if ((groundLevel(fr) + tc) - feet <= 1) moves.push({ from: { r: r, c: c }, to: { r: fr, c: c }, type: 'climb' });
+        }
+      }
+
+      // straight forward two (only from the second row)
+      if (r === secondRowOf(player) && stack.length === 1) {
+        var mr = r + dir, dr = r + 2 * dir;
+        if (inBounds(dr, c) && stackAt(s, mr, c).length === 0 && stackAt(s, dr, c).length === 0)
+          moves.push({ from: { r: r, c: c }, to: { r: dr, c: c }, type: 'double' });
+      }
+
+      // diagonal captures (same level only)
+      var diags = [-1, 1];
+      for (var i = 0; i < diags.length; i++) {
+        var tr = r + dir, tcc = c + diags[i];
+        if (!inBounds(tr, tcc)) continue;
+        var tstack = stackAt(s, tr, tcc);
+        if (!tstack.length) continue;
+        var target = tstack[tstack.length - 1];
+        if (target.color === player) continue;
+        var targetFeet = groundLevel(tr) + (tstack.length - 1);
+        // Capture on the same level OR downhill (any depth below). Uphill forbidden.
+        if (targetFeet <= feet)
+          moves.push({ from: { r: r, c: c }, to: { r: tr, c: tcc }, type: 'capture', captureId: target.id });
+      }
+
+      return moves;
+    }
+
+    function allMoves(s, player) {
+      if (player === undefined) player = s.current;
+      var saved = s.current; s.current = player;
+      var list = [];
+      for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+        var t = topPiece(s, r, c);
+        if (t && t.color === player) list = list.concat(generateMoves(s, r, c));
+      }
+      s.current = saved;
+      return list;
+    }
+    function hasMoves(s, player) { return allMoves(s, player).length > 0; }
+
+    function applyMove(s, move) {
+      var ns = cloneState(s);
+      var fromStack = ns.board[move.from.r][move.from.c];
+      var mover = fromStack.pop();
+      var capturedId = null;
+      if (move.type === 'capture') {
+        var cap = ns.board[move.to.r][move.to.c].pop();
+        capturedId = cap ? cap.id : null;
+        ns.caps[mover.color]++;
+      }
+      ns.board[move.to.r][move.to.c].push(mover);
+      var toLevel = ns.board[move.to.r][move.to.c].length - 1;
+
+      if (backRowFull(ns, mover.color)) {
+        ns.winner = mover.color; ns.over = true; ns.lastSkipped = null;
+      } else {
+        var opp = other(mover.color), next = null, skipped = null;
+        if (hasMoves(ns, opp)) { next = opp; }
+        else if (hasMoves(ns, mover.color)) { next = mover.color; skipped = opp; }
+        if (next === null) { ns.over = true; ns.winner = decideWinner(ns); }
+        else { ns.current = next; ns.lastSkipped = skipped; }
+      }
+      return { state: ns, moverId: mover.id, capturedId: capturedId, toLevel: toLevel, move: move };
+    }
+
+    // SCORE counts pawns on BOTH of the opponent's home rows (stacks count).
+    function deliveredSquares(s, player) {
+      var rows = scoreRowsOf(player), n = 0;
+      for (var i = 0; i < rows.length; i++) for (var c = 0; c < COLS; c++)
+        if (s.board[rows[i]][c].some(function (p) { return p.color === player; })) n++;
+      return n;
+    }
+    function deliveredPawns(s, player) {
+      var rows = scoreRowsOf(player), n = 0;
+      for (var i = 0; i < rows.length; i++) for (var c = 0; c < COLS; c++)
+        n += s.board[rows[i]][c].filter(function (p) { return p.color === player; }).length;
+      return n;
+    }
+    // instant win = occupy every square of the opponent's BACK row
+    function backRowFull(s, player) {
+      var row = scoreRowOf(player);
+      for (var c = 0; c < COLS; c++)
+        if (!s.board[row][c].some(function (p) { return p.color === player; })) return false;
+      return true;
+    }
+    function decideWinner(s) {
+      // 1) most PAWNS delivered (stacks count)  2) tiebreak: most captures  3) draw
+      var w = deliveredPawns(s, WHITE), b = deliveredPawns(s, BLACK);
+      if (w > b) return WHITE; if (b > w) return BLACK;
+      if (s.caps.W > s.caps.B) return WHITE; if (s.caps.B > s.caps.W) return BLACK;
+      return 'draw';
+    }
+
+    // ====================================================================
+    // RENDERING + INTERACTION
+    // ====================================================================
+    var S = 1, DEPTH = 0.5, PAWN_H = 0.5, PAWN_R = 0.34, TILE_T = 0.06;
+    var surfaceY = function (r) { return isTopRow(r) ? 0 : -DEPTH; };
+    var worldX = function (c) { return (c - (COLS - 1) / 2) * S; };
+    var worldZ = function (r) { return (r - (ROWS - 1) / 2) * S; };
+    var pawnY = function (r, level) { return surfaceY(r) + level * PAWN_H + PAWN_H / 2; };
+
+    var C_LIGHT = 0xe6cd92, C_DARK = 0x3a230f, C_PLATEAU = 0x6b4622, C_VALLEY = 0x2f1d0c;
+    var C_WHITE = 0xefe6cf, C_BLACK = 0x161310;
+    var C_MOVE = 0x36d66b, C_CAP = 0xe8483f, C_SEL = 0xffd23f;
+
+    var canvas = document.getElementById('scene');
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0); // transparent -> the CSS gradient backdrop shows through
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    if ('outputEncoding' in renderer && THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+    if (THREE.ACESFilmicToneMapping) { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; }
+
+    var scene = new THREE.Scene();
+    scene.background = null;
+    scene.fog = new THREE.Fog(0x14161c, 16, 34); // gentle depth falloff
+
+    var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.set(0, 7.5, 8.5);
+
+    var controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, -0.5, 0);
+    controls.enableDamping = true; controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI / 2.05;
+    controls.minDistance = 5; controls.maxDistance = 20;
+
+    scene.add(new THREE.HemisphereLight(0xfff4e2, 0x3a3326, 0.62)); // warm sky / earthy ground
+    var sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
+    sun.position.set(5.5, 12, 6.5); sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 4; sun.shadow.bias = -0.0005;
+    var sc = sun.shadow.camera;
+    sc.left = -7; sc.right = 7; sc.top = 9; sc.bottom = -9; sc.near = 1; sc.far = 30;
+    scene.add(sun);
+    var fill = new THREE.DirectionalLight(0xafc2ff, 0.22); // cool rim/fill for contrast
+    fill.position.set(-6, 4, -5); scene.add(fill);
+
+    // ---- Board geometry ----
+    var boardGroup = new THREE.Group(); scene.add(boardGroup);
+    function woodMat(color) { return new THREE.MeshStandardMaterial({ color: color, roughness: 0.78, metalness: 0.04 }); }
+    function addBox(w, h, d, x, y, z, mat, shadow) {
+      if (shadow === undefined) shadow = true;
+      var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true;
+      boardGroup.add(m); return m;
+    }
+    var plateauMat = woodMat(C_PLATEAU);
+    addBox(COLS * S, 1, 2 * S, 0, -0.5, worldZ(0.5), plateauMat);
+    addBox(COLS * S, 1, 2 * S, 0, -0.5, worldZ(5.5), plateauMat);
+    addBox(COLS * S, 1, 3 * S, 0, -DEPTH - 0.5, worldZ(3), woodMat(C_VALLEY));
+    addBox(COLS * S + 0.3, 0.4, ROWS * S + 0.3, 0, -1.7, 0, woodMat(0x3a2b1c), false);
+    // capture trays either side
+    addBox(0.85, 0.18, 5.6, 3.4, -0.09, 0, woodMat(0x2e2114), false);
+    addBox(0.85, 0.18, 5.6, -3.4, -0.09, 0, woodMat(0x2e2114), false);
+
+    var tileMatLight = woodMat(C_LIGHT), tileMatDark = woodMat(C_DARK);
+    var tileGeo = new THREE.BoxGeometry(S * 0.96, TILE_T, S * 0.96);
+    for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+      var mat = (r + c) % 2 === 0 ? tileMatLight : tileMatDark;
+      var tile = new THREE.Mesh(tileGeo, mat);
+      tile.position.set(worldX(c), surfaceY(r) + TILE_T / 2, worldZ(r));
+      tile.receiveShadow = true;
+      tile.userData = { r: r, c: c, kind: 'tile' };
+      boardGroup.add(tile);
+    }
+
+    // ---- Pawns ----
+    // Beveled "checker" disc (rounded top/bottom rim) via a lathe profile — softer
+    // and more premium-looking than a hard-edged cylinder.
+    var pawnGeo = (function () {
+      var R = PAWN_R, h = PAWN_H / 2, b = Math.min(0.07, PAWN_H * 0.28);
+      var pts = [
+        new THREE.Vector2(0, -h),
+        new THREE.Vector2(R - b, -h),
+        new THREE.Vector2(R, -h + b),
+        new THREE.Vector2(R, h - b),
+        new THREE.Vector2(R - b, h),
+        new THREE.Vector2(0, h)
+      ];
+      var g = new THREE.LatheGeometry(pts, 48);
+      g.computeVertexNormals();
+      return g;
+    })();
+    var matWhite = new THREE.MeshStandardMaterial({ color: C_WHITE, roughness: 0.5, metalness: 0.05 });
+    var matBlack = new THREE.MeshStandardMaterial({ color: C_BLACK, roughness: 0.5, metalness: 0.1 });
+    var pawnGroup = new THREE.Group(); scene.add(pawnGroup);
+    var pieceMeshes = {};   // id -> mesh
+
+    function makePawnMesh(piece) {
+      var mesh = new THREE.Mesh(pawnGeo, piece.color === WHITE ? matWhite : matBlack);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      var ring = new THREE.Mesh(
+        new THREE.TorusGeometry(PAWN_R * 0.72, 0.03, 10, 32),
+        new THREE.MeshStandardMaterial({ color: piece.color === WHITE ? 0xd8c89a : 0x33302b, roughness: 0.6 })
+      );
+      ring.rotation.x = Math.PI / 2; ring.position.y = PAWN_H / 2 - 0.02; mesh.add(ring);
+      mesh.userData = { id: piece.id, kind: 'pawn' };
+      pieceMeshes[piece.id] = mesh; pawnGroup.add(mesh);
+      return mesh;
+    }
+
+    // ---- Highlight markers ----
+    var markerGroup = new THREE.Group(); scene.add(markerGroup);
+    var selRingGeo = new THREE.RingGeometry(PAWN_R * 1.15, PAWN_R * 1.45, 32);
+    var pulsates = [];   // materials that pulse to draw attention (capture targets)
+    function clearMarkers() {
+      while (markerGroup.children.length) {
+        var m = markerGroup.children.pop();
+        if (m.geometry && m.geometry.dispose) m.geometry.dispose();
+      }
+      pulsates.length = 0;
+      selRing = null;
+    }
+    function flatMarker(geo, color, op, cc, y, rr, move) {
+      var mat = new THREE.MeshBasicMaterial({ color: color, transparent: op < 1, opacity: op, side: THREE.DoubleSide });
+      var m = new THREE.Mesh(geo, mat);
+      m.rotation.x = -Math.PI / 2; m.position.set(worldX(cc), y, worldZ(rr));
+      m.userData = { move: move, kind: 'marker' }; markerGroup.add(m);
+      return m;
+    }
+    function addMoveMarker(move) {
+      var rr = move.to.r, cc = move.to.c;
+      var destStack = state.board[rr][cc].length;
+      if (move.type === 'capture') {
+        // Wrap the victim (top pawn) in a pulsing red shell + a reticle above it.
+        var vLevel = destStack - 1;
+        var cy = surfaceY(rr) + vLevel * PAWN_H + PAWN_H / 2;
+        var shellMat = new THREE.MeshBasicMaterial({ color: C_CAP, transparent: true, opacity: 0.42, depthWrite: false });
+        var shell = new THREE.Mesh(new THREE.CylinderGeometry(PAWN_R * 1.3, PAWN_R * 1.3, PAWN_H * 1.08, 24), shellMat);
+        shell.position.set(worldX(cc), cy, worldZ(rr));
+        shell.userData = { move: move, kind: 'marker' };
+        markerGroup.add(shell); pulsates.push(shellMat);
+        var topY = surfaceY(rr) + destStack * PAWN_H + 0.16;
+        flatMarker(new THREE.CircleGeometry(PAWN_R * 0.55, 24), C_CAP, 0.9, cc, topY + 0.002, rr, move);
+        flatMarker(new THREE.RingGeometry(PAWN_R * 0.72, PAWN_R * 1.0, 28), C_CAP, 1, cc, topY, rr, move);
+      } else {
+        // move/climb: green disc + ring on the landing spot (top of any stack)
+        var y = surfaceY(rr) + destStack * PAWN_H + TILE_T + 0.04;
+        flatMarker(new THREE.CircleGeometry(PAWN_R * 0.85, 28), C_MOVE, 0.55, cc, y, rr, move);
+        flatMarker(new THREE.RingGeometry(PAWN_R * 0.9, PAWN_R * 1.05, 28), C_MOVE, 1, cc, y + 0.005, rr, move);
+      }
+    }
+    var selRing = null;
+    function showSelection(rr, cc) {
+      selRing = new THREE.Mesh(selRingGeo, new THREE.MeshBasicMaterial({ color: C_SEL, side: THREE.DoubleSide }));
+      selRing.rotation.x = -Math.PI / 2;
+      var level = state.board[rr][cc].length - 1;
+      selRing.position.set(worldX(cc), surfaceY(rr) + level * PAWN_H + TILE_T + 0.03, worldZ(rr));
+      markerGroup.add(selRing);
+    }
+
+    // ---- Last-move highlight + captured trays ----
+    // id -> color for every pawn in the CURRENT game (recomputed at play start,
+    // since free setup assigns ids dynamically). Used by the captured trays.
+    var lastMoveGroup = new THREE.Group(); scene.add(lastMoveGroup);
+    var lastSqGeo = new THREE.PlaneGeometry(S * 0.9, S * 0.9);
+    function clearLastMove() { while (lastMoveGroup.children.length) lastMoveGroup.remove(lastMoveGroup.children[0]); }
+    function markSquare(r, c, color, op) {
+      var m = new THREE.Mesh(lastSqGeo, new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: op, side: THREE.DoubleSide }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(worldX(c), surfaceY(r) + TILE_T + 0.015, worldZ(r));
+      lastMoveGroup.add(m);
+    }
+    function showLastMove(move) {
+      clearLastMove();
+      if (!move) return;
+      markSquare(move.from.r, move.from.c, 0x4aa3ff, 0.26);
+      markSquare(move.to.r, move.to.c, 0x4aa3ff, 0.44);
+    }
+
+    var trayGroup = new THREE.Group(); scene.add(trayGroup);
+    // Render the trays straight from the authoritative capture counters so they
+    // ALWAYS match the score (caps.B = white pawns Black took; caps.W = black ones).
+    function updateCaptured() {
+      while (trayGroup.children.length) trayGroup.remove(trayGroup.children[0]);
+      var caps = state.caps || { W: 0, B: 0 };
+      function addTray(color, n) {
+        for (var i = 0; i < n; i++) {
+          var mesh = new THREE.Mesh(pawnGeo, color === WHITE ? matWhite : matBlack);
+          mesh.scale.set(0.5, 0.5, 0.5); mesh.castShadow = true;
+          mesh.position.set(color === WHITE ? 3.4 : -3.4, PAWN_H * 0.25, -2.4 + i * 0.62);
+          trayGroup.add(mesh);
+        }
+      }
+      addTray(WHITE, caps.B);  // white pawns captured by Black
+      addTray(BLACK, caps.W);  // black pawns captured by White
+    }
+
+    // ---- Move log ----
+    var moveLog = [];   // { color, text }
+    var elMoves = document.getElementById('moves');
+    function sqName(r, c) { return 'ABCD'.charAt(c) + (r + 1); }
+    function notate(move) {
+      var sep = move.type === 'capture' ? 'x' : (move.type === 'climb' ? '↑' : '–');
+      return sqName(move.from.r, move.from.c) + sep + sqName(move.to.r, move.to.c);
+    }
+    function renderMoves() {
+      if (!moveLog.length) { elMoves.innerHTML = '<li class="empty">No moves yet.</li>'; return; }
+      var html = '';
+      for (var i = 0; i < moveLog.length; i++)
+        html += '<li><span class="n">' + (i + 1) + '</span><span class="pc ' + moveLog[i].color + '"></span>' + moveLog[i].text + '</li>';
+      elMoves.innerHTML = html;
+      elMoves.scrollTop = elMoves.scrollHeight;
+    }
+
+    // ---- Sound ----
+    var audioCtx = null, muted = false;
+    function ensureAudio() { if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
+    function beep(freq, dur, type, gainV) {
+      if (muted || !audioCtx) return;
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type || 'sine'; o.frequency.value = freq;
+      o.connect(g); g.connect(audioCtx.destination);
+      var t = audioCtx.currentTime; g.gain.setValueAtTime(gainV || 0.06, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur);
+    }
+    function sfxFor(type) {
+      if (type === 'capture') beep(170, 0.18, 'sawtooth', 0.09);
+      else if (type === 'climb') { beep(523, 0.07, 'sine'); setTimeout(function () { beep(659, 0.09, 'sine'); }, 70); }
+      else beep(440, 0.08, 'triangle');
+    }
+    function sfxWin() { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { beep(f, 0.2, 'triangle', 0.08); }, i * 130); }); }
+    document.addEventListener('pointerdown', ensureAudio);
+    var btnMute = document.getElementById('btn-mute');
+    btnMute.addEventListener('click', function () { muted = !muted; btnMute.textContent = muted ? '🔇' : '🔊'; });
+
+    // ---- Win overlay + confetti ----
+    var winOver = document.getElementById('winover');
+    var winMsg = document.getElementById('win-msg');
+    var confettiEl = document.getElementById('confetti');
+    function launchConfetti() {
+      confettiEl.innerHTML = '';
+      var colors = ['#e8483f', '#36d66b', '#4aa3ff', '#ffd23f', '#efe6cf', '#e07be0'];
+      for (var i = 0; i < 90; i++) {
+        var d = document.createElement('div');
+        d.className = 'confetti-piece';
+        d.style.left = (Math.random() * 100) + 'vw';
+        d.style.background = colors[i % colors.length];
+        d.style.animationDuration = (2 + Math.random() * 2) + 's';
+        d.style.animationDelay = (Math.random() * 0.6) + 's';
+        confettiEl.appendChild(d);
+      }
+      setTimeout(function () { confettiEl.innerHTML = ''; }, 4800);
+    }
+    function showWinOverlay(skipFx) {
+      var caps = state.caps || { W: 0, B: 0 };
+      var dw = deliveredPawns(state, WHITE), db = deliveredPawns(state, BLACK);
+      if (state.winner === 'draw') winMsg.textContent = "It's a draw!";
+      else {
+        var byCaps = dw === db;
+        winMsg.textContent = (state.winner === WHITE ? 'White' : 'Black') + ' wins!' + (byCaps ? ' (on captures)' : '');
+        if (!skipFx) launchConfetti();
+      }
+      document.getElementById('win-detail').innerHTML =
+        'White: ' + dw + ' delivered · ' + caps.W + ' captured<br>' +
+        'Black: ' + db + ' delivered · ' + caps.B + ' captured';
+      winOver.classList.remove('hidden');
+    }
+    function hideWinOverlay() { winOver.classList.add('hidden'); confettiEl.innerHTML = ''; }
+    document.getElementById('win-again').addEventListener('click', function () { hideWinOverlay(); newGame(); });
+
+    // ---- Camera presets ----
+    var VIEWS = {
+      angle: { p: new THREE.Vector3(0, 7.5, 8.5), t: new THREE.Vector3(0, -0.5, 0) },
+      top: { p: new THREE.Vector3(0, 13.5, 0.01), t: new THREE.Vector3(0, -0.5, 0) },
+      side: { p: new THREE.Vector3(0, 3.2, 9.8), t: new THREE.Vector3(0, -0.6, 0) }
+    };
+    var camTween = null;
+    function flyTo(name) {
+      var v = VIEWS[name]; if (!v) return;
+      camTween = { p0: camera.position.clone(), p1: v.p.clone(), t0: controls.target.clone(), t1: v.t.clone(), t: 0, dur: 600 };
+      Array.prototype.forEach.call(document.querySelectorAll('#viewbar button[data-view]'), function (b) {
+        b.classList.toggle('active', b.getAttribute('data-view') === name);
+      });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('#viewbar button[data-view]'), function (b) {
+      b.addEventListener('click', function () { flyTo(b.getAttribute('data-view')); });
+    });
+
+    // ---- State + mesh sync ----
+    var STORAGE_KEY = 'pawns-of-the-valley-save';
+    var state = createInitialState();
+    var history = [];               // snapshots taken BEFORE each move (for undo)
+    var selected = null, legal = [], animating = false;
+    var vsComputer = false, computerColor = BLACK;
+    var aiTimer = null;
+    var phase = 'play';             // 'setup' | 'play'
+
+    function saveGame() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          state: state, vsComputer: vsComputer, history: history.slice(-60), moveLog: moveLog.slice(-200)
+        }));
+      } catch (e) { /* storage may be unavailable; undo still works in-memory */ }
+    }
+    function loadGame() {
+      try {
+        var raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        var data = JSON.parse(raw);
+        if (!data || !data.state || !data.state.board) return null;
+        return data;
+      } catch (e) { return null; }
+    }
+
+    function syncMeshesToBoard(animate) {
+      var present = {};
+      for (var rr = 0; rr < ROWS; rr++) for (var cc = 0; cc < COLS; cc++) {
+        var stack = state.board[rr][cc];
+        for (var level = 0; level < stack.length; level++) {
+          var piece = stack[level];
+          present[piece.id] = true;
+          var mesh = pieceMeshes[piece.id] || makePawnMesh(piece);
+          var target = new THREE.Vector3(worldX(cc), pawnY(rr, level), worldZ(rr));
+          if (animate) tweenTo(mesh, target); else mesh.position.copy(target);
+        }
+      }
+      for (var id in pieceMeshes) {
+        if (!present[id]) { pawnGroup.remove(pieceMeshes[id]); delete pieceMeshes[id]; }
+      }
+    }
+
+    // ---- Tweening ----
+    var tweens = [];
+    function tweenTo(mesh, target, dur) {
+      dur = dur || 320;
+      var start = mesh.position.clone();
+      var peak = Math.max(start.y, target.y) + 0.55;
+      tweens.push({ mesh: mesh, start: start, target: target, peak: peak, t: 0, dur: dur });
+    }
+    function updateTweens(dt) {
+      if (!tweens.length) return;
+      animating = true;
+      for (var i = tweens.length - 1; i >= 0; i--) {
+        var tw = tweens[i]; tw.t += dt;
+        var k = Math.min(tw.t / tw.dur, 1);
+        var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        tw.mesh.position.x = tw.start.x + (tw.target.x - tw.start.x) * e;
+        tw.mesh.position.z = tw.start.z + (tw.target.z - tw.start.z) * e;
+        var base = tw.start.y + (tw.target.y - tw.start.y) * e;
+        var arc = Math.sin(Math.PI * k) * (tw.peak - Math.max(tw.start.y, tw.target.y));
+        tw.mesh.position.y = base + arc;
+        if (k >= 1) { tw.mesh.position.copy(tw.target); tweens.splice(i, 1); }
+      }
+      if (!tweens.length) animating = false;
+    }
+
+    // ---- Interaction ----
+    var raycaster = new THREE.Raycaster();
+    var pointer = new THREE.Vector2();
+    var downPos = null;
+    controls.enablePan = false; // free up right-click for setup removal
+    renderer.domElement.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    renderer.domElement.addEventListener('pointerdown', function (e) { downPos = { x: e.clientX, y: e.clientY }; });
+    renderer.domElement.addEventListener('pointerup', function (e) {
+      if (!downPos) return;
+      var moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+      downPos = null;
+      if (moved > 6) return;
+      if (phase === 'setup') { handleSetupClick(e); return; }
+      if (animating || state.over) return;
+      if (vsComputer && state.current === computerColor) return;
+      handleClick(e);
+    });
+
+    function handleClick(e) {
+      var rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      var mHits = raycaster.intersectObjects(markerGroup.children, false);
+      for (var i = 0; i < mHits.length; i++) {
+        if (mHits[i].object.userData && mHits[i].object.userData.move) { doMove(mHits[i].object.userData.move); return; }
+      }
+      var pHits = raycaster.intersectObjects(pawnGroup.children, true);
+      if (pHits.length) {
+        var obj = pHits[0].object;
+        while (obj && !(obj.userData && obj.userData.id)) obj = obj.parent;
+        if (obj) {
+          // Clicking ANY part of a pawn that sits on a legal target square
+          // performs that move (capture or climb) — not just its base.
+          var pc = cellByAnyPieceId(obj.userData.id);
+          if (pc) {
+            var pmv = legal.filter(function (m) { return m.to.r === pc.r && m.to.c === pc.c; })[0];
+            if (pmv) { doMove(pmv); return; }
+          }
+          trySelectPawn(obj.userData.id); return;
+        }
+      }
+      var tHits = raycaster.intersectObjects(boardGroup.children, false);
+      for (var j = 0; j < tHits.length; j++) {
+        var ud = tHits[j].object.userData;
+        if (ud && ud.kind === 'tile') {
+          var mv = legal.filter(function (m) { return m.to.r === ud.r && m.to.c === ud.c; })[0];
+          if (mv) { doMove(mv); return; }
+          trySelectAt(ud.r, ud.c); return;
+        }
+      }
+      deselect();
+    }
+
+    function findCellOfPiece(id) {
+      for (var rr = 0; rr < ROWS; rr++) for (var cc = 0; cc < COLS; cc++) {
+        var st = state.board[rr][cc];
+        if (st.length && st[st.length - 1].id === id) return { r: rr, c: cc };
+      }
+      return null;
+    }
+    function cellByAnyPieceId(id) {
+      for (var rr = 0; rr < ROWS; rr++) for (var cc = 0; cc < COLS; cc++) {
+        var st = state.board[rr][cc];
+        for (var k = 0; k < st.length; k++) if (st[k].id === id) return { r: rr, c: cc };
+      }
+      return null;
+    }
+    function trySelectPawn(id) { var cell = findCellOfPiece(id); if (!cell) { deselect(); return; } trySelectAt(cell.r, cell.c); }
+    function trySelectAt(rr, cc) {
+      var st = state.board[rr][cc];
+      var top = st.length ? st[st.length - 1] : null;
+      if (!top || top.color !== state.current) { deselect(); return; }
+      selected = { r: rr, c: cc };
+      legal = generateMoves(state, rr, cc);
+      clearMarkers(); showSelection(rr, cc);
+      legal.forEach(addMoveMarker);
+      setHint(legal.length === 0 ? 'That pawn has no legal moves.' : '');
+    }
+    function deselect() { selected = null; legal = []; clearMarkers(); }
+
+    function doMove(move) {
+      deselect();
+      ensureAudio();
+      var moverColor = state.current;
+      history.push(cloneState(state));
+      if (history.length > 80) history.shift();
+      var res = applyMove(state, move);
+      state = res.state;
+      moveLog.push({ color: moverColor, text: notate(move) });
+      if (moveLog.length > 200) moveLog.shift();
+      showLastMove(move);
+      syncMeshesToBoard(true);   // cosmetic hop; does NOT gate game logic
+      updateCaptured();
+      renderMoves();
+      sfxFor(move.type);
+      saveGame();
+      updateHUD();
+      // Follow-ups run independently of the animation so they never stall.
+      if (state.over) { sfxWin(); showWinOverlay(); }
+      else maybeComputerTurn();
+    }
+
+    function undo() {
+      if (animating) return;
+      if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+      if (!history.length) return;
+      hideWinOverlay();
+      var pops = 0;
+      state = history.pop(); pops++;
+      // In vs-Computer, also step back past the computer's reply to your turn.
+      while (vsComputer && state.current === computerColor && history.length) { state = history.pop(); pops++; }
+      for (var i = 0; i < pops; i++) moveLog.pop();
+      deselect();
+      tweens.length = 0; animating = false;
+      clearLastMove();
+      syncMeshesToBoard(false);
+      updateCaptured(); renderMoves();
+      updateHUD(); saveGame();
+    }
+
+    // ---- Simple AI ----
+    function evaluateMove(s, move, player) {
+      var score = 0, dir = dirOf(player);
+      var after = applyMove(s, move).state;
+      if (after.winner === player) score += 10000;
+      score += (deliveredSquares(after, player) - deliveredSquares(s, player)) * 400;
+      if (move.type === 'capture') score += 120;
+      score += dir * (move.to.r - move.from.r) * 15;
+      if (move.type === 'climb') score += 8;
+      var reply = allMoves(after, other(player));
+      if (reply.some(function (m) { return m.type === 'capture' && m.to.r === move.to.r && m.to.c === move.to.c; }))
+        score -= 90;
+      score += Math.random() * 6;
+      return score;
+    }
+    function maybeComputerTurn() {
+      if (!vsComputer || state.over || state.current !== computerColor) return;
+      aiTimer = setTimeout(function () {
+        aiTimer = null;
+        if (state.over || state.current !== computerColor) return;
+        var moves = allMoves(state, computerColor);
+        if (!moves.length) return;
+        var best = moves[0], bestScore = -Infinity;
+        for (var i = 0; i < moves.length; i++) {
+          var scv = evaluateMove(state, moves[i], computerColor);
+          if (scv > bestScore) { bestScore = scv; best = moves[i]; }
+        }
+        doMove(best);
+      }, 420);
+    }
+
+    // ---- HUD ----
+    var elTurn = document.getElementById('turn');
+    var elScoreW = document.getElementById('scoreW');
+    var elScoreB = document.getElementById('scoreB');
+    var elHint = document.getElementById('hint');
+    var elStatus = document.getElementById('status');
+    var btnUndo = document.getElementById('btn-undo');
+    function setHint(t) { elHint.textContent = t; }
+    function updateHUD() {
+      btnUndo.disabled = history.length === 0;
+      var caps = state.caps || { W: 0, B: 0 };
+      elScoreW.textContent = deliveredPawns(state, WHITE) + ' pawns (' + deliveredSquares(state, WHITE) + '/8 sq) · ' + caps.W + ' cap';
+      elScoreB.textContent = deliveredPawns(state, BLACK) + ' pawns (' + deliveredSquares(state, BLACK) + '/8 sq) · ' + caps.B + ' cap';
+      document.body.classList.toggle('turn-white', state.current === WHITE && !state.over);
+      document.body.classList.toggle('turn-black', state.current === BLACK && !state.over);
+      if (state.over) {
+        elTurn.textContent = 'Game over';
+        elStatus.textContent = state.winner === 'draw' ? "It's a draw." :
+          (state.winner === WHITE ? 'White' : 'Black') + ' wins!';
+      } else {
+        elTurn.textContent = (state.current === WHITE ? 'White' : 'Black') + ' to move';
+        elStatus.textContent = state.lastSkipped ?
+          (state.lastSkipped === WHITE ? 'White' : 'Black') + ' had no moves — skipped.' : '';
+      }
+    }
+
+    // ====================================================================
+    // SETUP PHASE — each side privately arranges its 8 pawns (any stacking)
+    // within its two home rows, then both reveal.
+    // ====================================================================
+    var SETUP_N = 8;
+    var setupColor = WHITE;
+    var setupPlace = { W: [], B: [] };          // arrays of { r, c }
+    var setupGroup = new THREE.Group(); scene.add(setupGroup);
+    var setupCellGroup = new THREE.Group(); scene.add(setupCellGroup);
+    var elSetup = document.getElementById('setup');
+    var elHandoff = document.getElementById('handoff');
+
+    function homeRows(color) { return color === WHITE ? [0, 1] : [ROWS - 2, ROWS - 1]; }
+    function isHomeCell(color, r, c) { return homeRows(color).indexOf(r) !== -1; }
+    function standardFormationFor(color) {
+      var f = []; homeRows(color).forEach(function (r) { for (var c = 0; c < COLS; c++) f.push({ r: r, c: c }); });
+      return f; // 8 pawns, one per home cell
+    }
+    function randomFormationFor(color) {
+      var cells = []; homeRows(color).forEach(function (r) { for (var c = 0; c < COLS; c++) cells.push({ r: r, c: c }); });
+      var f = []; for (var i = 0; i < SETUP_N; i++) { var cell = cells[Math.floor(Math.random() * cells.length)]; f.push({ r: cell.r, c: cell.c }); }
+      return f;
+    }
+    function aiFormation(color) { return Math.random() < 0.5 ? standardFormationFor(color) : randomFormationFor(color); }
+
+    function clearSetupVisuals() {
+      while (setupGroup.children.length) setupGroup.remove(setupGroup.children[0]);
+      while (setupCellGroup.children.length) setupCellGroup.remove(setupCellGroup.children[0]);
+    }
+    function renderSetup() {
+      clearSetupVisuals();
+      var counts = {};
+      setupPlace[setupColor].forEach(function (p) {
+        var k = p.r + ',' + p.c, lvl = counts[k] || 0; counts[k] = lvl + 1;
+        var mesh = new THREE.Mesh(pawnGeo, setupColor === WHITE ? matWhite : matBlack);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.position.set(worldX(p.c), pawnY(p.r, lvl), worldZ(p.r));
+        setupGroup.add(mesh);
+      });
+      homeRows(setupColor).forEach(function (r) {
+        for (var c = 0; c < COLS; c++) {
+          var ring = new THREE.Mesh(new THREE.RingGeometry(S * 0.30, S * 0.46, 22),
+            new THREE.MeshBasicMaterial({ color: 0x36d66b, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.set(worldX(c), surfaceY(r) + TILE_T + 0.02, worldZ(r));
+          setupCellGroup.add(ring);
+        }
+      });
+      var name = setupColor === WHITE ? 'White' : 'Black';
+      document.getElementById('setup-title').textContent =
+        vsComputer ? ('You are ' + name + ' — place your pawns') : (name + ': place your pawns');
+      var placed = setupPlace[setupColor].length;
+      document.getElementById('setup-count').textContent = 'Placed ' + placed + ' / ' + SETUP_N;
+      document.getElementById('su-ready').disabled = (placed !== SETUP_N);
+      var sm = document.getElementById('su-mode');
+      sm.textContent = vsComputer ? 'Opponent: Computer' : 'Opponent: 2 Players';
+      sm.style.display = (!vsComputer && setupColor === BLACK) ? 'none' : ''; // hide only during hotseat Black setup
+    }
+
+    function enterSetup() {
+      if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+      phase = 'setup';
+      hideWinOverlay();
+      document.body.classList.add('setup-phase');
+      elSetup.classList.remove('hidden');
+      setHint('');
+      deselect(); clearMarkers(); clearLastMove();
+      for (var id in pieceMeshes) pawnGroup.remove(pieceMeshes[id]);
+      pieceMeshes = {};
+      while (trayGroup.children.length) trayGroup.remove(trayGroup.children[0]);
+      tweens.length = 0; animating = false;
+      setupPlace = { W: [], B: [] };
+      if (vsComputer) {
+        // randomly assign the human a color so they aren't always White
+        computerColor = Math.random() < 0.5 ? WHITE : BLACK;
+        setupColor = other(computerColor);                 // human's color
+      } else {
+        setupColor = WHITE;                                // hotseat: White sets up first
+      }
+      // start EMPTY so clicking immediately places pawns (use "Standard" for the default)
+      flyTo('angle');
+      renderSetup();
+    }
+
+    function removeSetupPawn(r, c) {
+      var arr = setupPlace[setupColor];
+      for (var i = arr.length - 1; i >= 0; i--) if (arr[i].r === r && arr[i].c === c) { arr.splice(i, 1); return; }
+    }
+    function handleSetupClick(e) {
+      var rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      var tHits = raycaster.intersectObjects(boardGroup.children, false);
+      for (var i = 0; i < tHits.length; i++) {
+        var ud = tHits[i].object.userData;
+        if (ud && ud.kind === 'tile') {
+          if (!isHomeCell(setupColor, ud.r, ud.c)) return;
+          if (e.button === 2) { removeSetupPawn(ud.r, ud.c); renderSetup(); }   // right-click removes
+          else if (setupPlace[setupColor].length < SETUP_N) { setupPlace[setupColor].push({ r: ud.r, c: ud.c }); renderSetup(); }
+          return;
+        }
+      }
+    }
+
+    function onSetupReady() {
+      if (setupPlace[setupColor].length !== SETUP_N) return;
+      ensureAudio();
+      if (vsComputer) {
+        // human just finished their color; the computer deploys its own
+        setupPlace[computerColor] = aiFormation(computerColor);
+        startPlay();
+      } else if (setupColor === WHITE) {
+        // hotseat: hand off to Black (empty board, place freely)
+        setupColor = BLACK;
+        setupPlace[BLACK] = [];
+        renderSetup();
+        elHandoff.classList.remove('hidden'); // hides board while passing the device
+      } else { startPlay(); }
+    }
+
+    function startPlay() {
+      var board = [];
+      for (var r = 0; r < ROWS; r++) { board[r] = []; for (var c = 0; c < COLS; c++) board[r][c] = []; }
+      var id = 1;
+      setupPlace[WHITE].forEach(function (p) { board[p.r][p.c].push({ color: WHITE, id: id++ }); });
+      setupPlace[BLACK].forEach(function (p) { board[p.r][p.c].push({ color: BLACK, id: id++ }); });
+      state = { board: board, current: WHITE, winner: null, over: false, lastSkipped: null, caps: { W: 0, B: 0 } };
+      history = []; moveLog = [];
+      phase = 'play';
+      document.body.classList.remove('setup-phase');
+      elSetup.classList.add('hidden'); elHandoff.classList.add('hidden');
+      clearSetupVisuals();
+      for (var pid in pieceMeshes) pawnGroup.remove(pieceMeshes[pid]);
+      pieceMeshes = {};
+      tweens.length = 0; animating = false;
+      clearLastMove();
+      syncMeshesToBoard(false);
+      updateCaptured(); renderMoves(); updateHUD();
+      flyTo('angle');
+      saveGame();
+      maybeComputerTurn();
+    }
+
+    document.getElementById('su-standard').addEventListener('click', function () { setupPlace[setupColor] = standardFormationFor(setupColor); renderSetup(); });
+    document.getElementById('su-random').addEventListener('click', function () { setupPlace[setupColor] = randomFormationFor(setupColor); renderSetup(); });
+    document.getElementById('su-clear').addEventListener('click', function () { setupPlace[setupColor] = []; renderSetup(); });
+    document.getElementById('su-undo').addEventListener('click', function () { setupPlace[setupColor].pop(); renderSetup(); });
+    document.getElementById('su-ready').addEventListener('click', onSetupReady);
+    document.getElementById('su-mode').addEventListener('click', function () {
+      vsComputer = !vsComputer;
+      document.getElementById('btn-mode').textContent = vsComputer ? 'Mode: vs Computer' : 'Mode: 2 Players';
+      enterSetup(); // restart setup so the color assignment matches the new mode
+    });
+    document.getElementById('handoff-go').addEventListener('click', function () { elHandoff.classList.add('hidden'); flyTo('angle'); renderSetup(); });
+
+    // ---- Controls UI ----
+    function newGame() {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      enterSetup();
+    }
+    document.getElementById('btn-new').addEventListener('click', newGame);
+    btnUndo.addEventListener('click', undo);
+    var btnMode = document.getElementById('btn-mode');
+    btnMode.addEventListener('click', function () {
+      vsComputer = !vsComputer;
+      btnMode.textContent = vsComputer ? 'Mode: vs Computer' : 'Mode: 2 Players';
+      newGame();
+    });
+    var helpEl = document.getElementById('help');
+    function openHelp() { helpEl.classList.remove('hidden'); }
+    function closeHelp() { helpEl.classList.add('hidden'); }
+    document.getElementById('btn-help').addEventListener('click', openHelp);
+    document.getElementById('btn-help2').addEventListener('click', openHelp); // always-visible "?" (works in setup too)
+    document.getElementById('btn-close-help').addEventListener('click', closeHelp);
+    helpEl.addEventListener('click', function (e) { if (e.target === helpEl) closeHelp(); });
+    // Auto-show the guide once, on a player's first visit.
+    try { if (!localStorage.getItem('pawns-help-seen')) { openHelp(); localStorage.setItem('pawns-help-seen', '1'); } } catch (e) {}
+
+    // ---- Resize + loop ----
+    function resize() {
+      var w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize); resize();
+
+    var last = performance.now();
+    function loop(now) {
+      var dt = now - last; last = now;
+      updateTweens(dt);
+      if (pulsates.length) {
+        var op = 0.28 + 0.34 * (0.5 + 0.5 * Math.sin(now * 0.007));
+        for (var pi = 0; pi < pulsates.length; pi++) pulsates[pi].opacity = op;
+      }
+      if (camTween) {
+        camTween.t += dt;
+        var k = Math.min(camTween.t / camTween.dur, 1);
+        var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        camera.position.lerpVectors(camTween.p0, camTween.p1, e);
+        controls.target.lerpVectors(camTween.t0, camTween.t1, e);
+        if (k >= 1) camTween = null;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+
+    (function init() {
+      var saved = loadGame();
+      if (saved && saved.state && saved.state.board) {
+        state = saved.state;
+        history = (saved.history && saved.history.length) ? saved.history : [];
+        moveLog = (saved.moveLog && saved.moveLog.length) ? saved.moveLog : [];
+        vsComputer = !!saved.vsComputer;
+        phase = 'play';
+        document.body.classList.remove('setup-phase');
+        btnMode.textContent = vsComputer ? 'Mode: vs Computer' : 'Mode: 2 Players';
+        syncMeshesToBoard(false); updateCaptured(); renderMoves(); updateHUD();
+        setHint('Resumed your last game.');
+        if (state.over) showWinOverlay(true);
+        else if (vsComputer && state.current === computerColor) maybeComputerTurn();
+      } else {
+        enterSetup(); // fresh start -> design your formation
+      }
+    })();
+    requestAnimationFrame(loop);
+
+    // debug handle (harmless)
+    window.__pawns = { get state() { return state; }, legalFor: function (r, c) { return generateMoves(state, r, c); }, doMove: doMove, select: trySelectAt, refresh: function () { syncMeshesToBoard(false); updateCaptured(); updateHUD(); } };
+  })();
+  </script>
+</body>
+</html>
