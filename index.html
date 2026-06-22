@@ -44,6 +44,21 @@
     }
     button:hover { background: #4a5364; }
 
+    /* Minimize toggle for the top panel */
+    .panel-toggle {
+      position: absolute; top: 8px; right: 8px; z-index: 2;
+      width: 30px; height: 26px; padding: 0; font-size: 17px; line-height: 1;
+      background: rgba(255,255,255,0.08);
+    }
+    .setup-bar { position: relative; }
+    #hud.collapsed { width: auto; padding-right: 46px; }
+    #hud.collapsed h1, #hud.collapsed .scores, #hud.collapsed .status,
+    #hud.collapsed .hint, #hud.collapsed .buttons { display: none; }
+    #hud.collapsed .turn { margin-bottom: 0; }
+    #setup.collapsed .setup-bar { padding-right: 46px; }
+    #setup.collapsed .setup-btns, #setup.collapsed .setup-hint { display: none; }
+    #setup.collapsed #setup-count { margin-bottom: 0; }
+
     #loaderr {
       position: fixed; inset: 0; z-index: 30; display: none;
       align-items: center; justify-content: center; padding: 24px;
@@ -177,6 +192,7 @@
   <canvas id="scene"></canvas>
 
   <div id="hud">
+    <button id="hud-toggle" class="panel-toggle" title="Minimize panel">–</button>
     <h1>Pawns of the Valley</h1>
     <div id="turn" class="turn">White to move</div>
     <div class="scores">
@@ -200,6 +216,7 @@
 
   <div id="setup" class="hidden">
     <div class="setup-bar">
+      <button id="setup-toggle" class="panel-toggle" title="Minimize panel">–</button>
       <div id="setup-title">White: place your pawns</div>
       <div id="setup-count">Placed 8 / 8</div>
       <div class="setup-btns" style="margin-bottom:7px;">
@@ -1158,6 +1175,26 @@
     helpEl.addEventListener('click', function (e) { if (e.target === helpEl) closeHelp(); });
     // Auto-show the guide once, on a player's first visit.
     try { if (!localStorage.getItem('pawns-help-seen')) { openHelp(); localStorage.setItem('pawns-help-seen', '1'); } } catch (e) {}
+
+    // ---- Minimize toggles for the top panel (handy on phones) ----
+    var hudEl = document.getElementById('hud');
+    var hudToggle = document.getElementById('hud-toggle');
+    function setHudCollapsed(c) {
+      hudEl.classList.toggle('collapsed', c);
+      hudToggle.textContent = c ? '+' : '–';
+      hudToggle.title = c ? 'Expand panel' : 'Minimize panel';
+      try { localStorage.setItem('pawns-hud-collapsed', c ? '1' : '0'); } catch (e) {}
+    }
+    hudToggle.addEventListener('click', function () { setHudCollapsed(!hudEl.classList.contains('collapsed')); });
+    try { if (localStorage.getItem('pawns-hud-collapsed') === '1') setHudCollapsed(true); } catch (e) {}
+
+    var setupToggle = document.getElementById('setup-toggle');
+    setupToggle.addEventListener('click', function () {
+      var c = !elSetup.classList.contains('collapsed');
+      elSetup.classList.toggle('collapsed', c);
+      setupToggle.textContent = c ? '+' : '–';
+      setupToggle.title = c ? 'Expand panel' : 'Minimize panel';
+    });
 
     // ---- Resize + loop ----
     function resize() {
