@@ -15,6 +15,7 @@ export function makeGame(cfg) {
   const MUST = !!cfg.mandatoryCapture;    // must capture if able
   const SIDE = !!cfg.valleySideways;      // valley-floor pawns may shuffle sideways
   const TWO = !!cfg.twoRowScore;          // score on BOTH opponent home rows, not just the back row
+  const LEAP = !!cfg.doubleLeap;          // double-step may jump over a blocker on the pass-over square
   const isTop = (r) => r < PR || r >= ROWS - PR;
   const ground = (r) => (isTop(r) ? 1 : 0);
   const other = (p) => (p === WHITE ? BLACK : WHITE);
@@ -70,7 +71,9 @@ export function makeGame(cfg) {
     }
     if (r === secondRow(player) && stack.length === 1) {
       const mr = r + dir, dr = r + 2 * dir;
-      if (inB(dr, c) && s.board[mr][c].length === 0 && s.board[dr][c].length === 0)
+      // LEAP: ignore a blocker on the pass-over square (the double always descends);
+      // landing square must still be empty.
+      if (inB(dr, c) && (LEAP || s.board[mr][c].length === 0) && s.board[dr][c].length === 0)
         moves.push({ from: [r, c], to: [dr, c], type: 'double' });
     }
     if (SIDE && !isTop(r) && feet === 0) {            // sideways shuffle on the valley floor

@@ -352,10 +352,11 @@
         }
       }
 
-      // straight forward two (only from the second row)
+      // straight forward two (only from the second row) — may LEAP over a blocker on
+      // the pass-over square (the double always descends); landing must be empty.
       if (r === secondRowOf(player) && stack.length === 1) {
-        var mr = r + dir, dr = r + 2 * dir;
-        if (inBounds(dr, c) && stackAt(s, mr, c).length === 0 && stackAt(s, dr, c).length === 0)
+        var dr = r + 2 * dir;
+        if (inBounds(dr, c) && stackAt(s, dr, c).length === 0)
           moves.push({ from: { r: r, c: c }, to: { r: dr, c: c }, type: 'double' });
       }
 
