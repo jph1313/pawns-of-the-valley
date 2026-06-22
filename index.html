@@ -369,12 +369,17 @@
         }
       }
 
-      // straight forward two (only from the second row) — may LEAP over a blocker on
-      // the pass-over square (the double always descends); landing must be empty.
+      // straight forward two (only from a lone pawn on the second row) — may LEAP over a
+      // pass-over pawn ONLY if it sits strictly BELOW the mover's feet (clear something low,
+      // not jump a wall at your level or above); landing must be empty.
       if (r === secondRowOf(player) && stack.length === 1) {
-        var dr = r + 2 * dir;
-        if (inBounds(dr, c) && stackAt(s, dr, c).length === 0)
-          moves.push({ from: { r: r, c: c }, to: { r: dr, c: c }, type: 'double' });
+        var mr = r + dir, dr = r + 2 * dir;
+        if (inBounds(dr, c) && stackAt(s, dr, c).length === 0) {
+          var blk = stackAt(s, mr, c);
+          var blkTop = groundLevel(mr) + (blk.length - 1);
+          if (blk.length === 0 || blkTop < feet)
+            moves.push({ from: { r: r, c: c }, to: { r: dr, c: c }, type: 'double' });
+        }
       }
 
       // diagonal captures (same level only)
