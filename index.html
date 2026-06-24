@@ -138,6 +138,7 @@
       box-shadow: 0 8px 28px rgba(0,0,0,0.4);
     }
     #viewbar button.active { background: #5b6b86; }
+    #btn-rotate { font-size: 26px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 
     /* Win overlay + confetti */
     #winover { position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -204,6 +205,7 @@
     <div class="buttons">
       <button id="btn-new">New game</button>
       <button id="btn-undo">Undo</button>
+      <button id="btn-endgame" title="Auto-play the rest and reveal the result">End game</button>
       <button id="btn-mode">Mode: 2 Players</button>
       <button id="btn-help">How to play</button>
     </div>
@@ -218,7 +220,7 @@
     <div class="setup-bar">
       <button id="setup-toggle" class="panel-toggle" title="Minimize panel">–</button>
       <div id="setup-title">White: place your pawns</div>
-      <div id="setup-count">Placed 8 / 8</div>
+      <div id="setup-count">Placed 0 / 12</div>
       <div class="setup-btns" style="margin-bottom:7px;">
         <button id="su-mode">Opponent: 2 Players</button>
       </div>
@@ -229,7 +231,7 @@
         <button id="su-undo">Undo</button>
         <button id="su-ready">Ready</button>
       </div>
-      <div class="setup-hint"><b>Click</b> your glowing squares to place all 8 pawns (stack freely) · <b>right-click</b> or Undo to remove · or hit <b>Standard</b> for the default · drag to orbit.</div>
+      <div class="setup-hint"><b>Click</b> your glowing squares to place all 12 pawns (stack freely) · <b>right-click</b> or Undo to remove · or hit <b>Standard</b> for the default · drag to orbit.</div>
     </div>
   </div>
 
@@ -245,6 +247,7 @@
     <button data-view="angle" class="active">3D</button>
     <button data-view="top">Top</button>
     <button data-view="side">Side</button>
+    <button id="btn-rotate" title="Rotate view 45° right">⟳</button>
     <button id="btn-mute" title="Toggle sound">🔊</button>
     <button id="btn-help2" title="How to play">?</button>
   </div>
@@ -267,7 +270,7 @@
         <p>Get pawns into <b>either of your opponent's two home rows</b> (the glowing camp). Every pawn there scores — <b>stacks count too</b>. Fill their <b>back row</b> (all 4 squares) for an instant win; otherwise the <b>most pawns delivered</b> wins once no moves remain — ties go to <b>most captures</b>.</p></div>
 
       <div class="help-sec"><h3>Setup</h3>
-        <p>Each game opens with a <b>secret deployment</b>. Place your 8 pawns anywhere in your two home rows: <b>click</b> a glowing square to drop one and <b>stack freely</b>; <b>right-click</b> or <b>Undo</b> to remove; <b>Standard</b> fills the classic line. Both sides commit privately, then reveal.</p></div>
+        <p>Each game opens with a <b>secret deployment</b>. Place your 12 pawns anywhere in your two home rows: <b>click</b> a glowing square to drop one and <b>stack freely</b>; <b>right-click</b> or <b>Undo</b> to remove; <b>Standard</b> fills the classic line. Both sides commit privately, then reveal.</p></div>
 
       <div class="help-sec"><h3>Moving</h3>
         <p>Pawns move like chess pawns — <b>forward one</b> square, or <b>two</b> from their second row. They walk <b>down into the valley</b> freely.</p></div>
@@ -754,6 +757,17 @@
     Array.prototype.forEach.call(document.querySelectorAll('#viewbar button[data-view]'), function (b) {
       b.addEventListener('click', function () { flyTo(b.getAttribute('data-view')); });
     });
+    // Orbit the current view by `deg` around the target (positive = to the right).
+    function rotateView(deg) {
+      var t = controls.target.clone();
+      var off = camera.position.clone().sub(t);
+      var a = deg * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+      var p1 = new THREE.Vector3(off.x * cos - off.z * sin, off.y, off.x * sin + off.z * cos).add(t);
+      camTween = { p0: camera.position.clone(), p1: p1, t0: t.clone(), t1: t.clone(), t: 0, dur: 400 };
+      // a freehand rotation no longer matches a named preset
+      Array.prototype.forEach.call(document.querySelectorAll('#viewbar button[data-view]'), function (b) { b.classList.remove('active'); });
+    }
+    document.getElementById('btn-rotate').addEventListener('click', function () { rotateView(-45); });
 
     // ---- State + mesh sync ----
     var STORAGE_KEY = 'pawns-of-the-valley-save';
@@ -929,6 +943,7 @@
 
     function undo() {
       if (animating) return;
+      stopPlayout();
       if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
       if (!history.length) return;
       hideWinOverlay();
@@ -960,7 +975,42 @@
       score += Math.random() * 6;
       return score;
     }
+    // ---- End game: fast-forward the rest so the player sees the result play out ----
+    var playoutActive = false, playoutTimer = null;
+    function bestMoveFor(player) {
+      var moves = allMoves(state, player);
+      if (!moves.length) return null;
+      var best = moves[0], bestScore = -Infinity;
+      for (var i = 0; i < moves.length; i++) {
+        var sc = evaluateMove(state, moves[i], player);
+        if (sc > bestScore) { bestScore = sc; best = moves[i]; }
+      }
+      return best;
+    }
+    function runPlayout() {
+      playoutTimer = null;
+      if (!playoutActive || state.over) { playoutActive = false; return; }
+      var mv = bestMoveFor(state.current);
+      if (!mv) { playoutActive = false; return; }   // applyMove already handles skips/termination
+      doMove(mv);                                    // animates + ends the game when terminal
+      if (playoutActive && !state.over) playoutTimer = setTimeout(runPlayout, 240);
+      else playoutActive = false;
+    }
+    function endGamePlayout() {
+      if (phase !== 'play' || state.over || playoutActive) return;
+      playoutActive = true;
+      if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }  // the playout drives BOTH sides
+      deselect();
+      runPlayout();
+    }
+    function stopPlayout() {
+      playoutActive = false;
+      if (playoutTimer) { clearTimeout(playoutTimer); playoutTimer = null; }
+    }
+    document.getElementById('btn-endgame').addEventListener('click', endGamePlayout);
+
     function maybeComputerTurn() {
+      if (playoutActive) return;
       if (!vsComputer || state.over || state.current !== computerColor) return;
       aiTimer = setTimeout(function () {
         aiTimer = null;
@@ -1003,10 +1053,10 @@
     }
 
     // ====================================================================
-    // SETUP PHASE — each side privately arranges its 8 pawns (any stacking)
+    // SETUP PHASE — each side privately arranges its 12 pawns (any stacking)
     // within its two home rows, then both reveal.
     // ====================================================================
-    var SETUP_N = 8;
+    var SETUP_N = 12;
     var setupColor = WHITE;
     var setupPlace = { W: [], B: [] };          // arrays of { r, c }
     var setupGroup = new THREE.Group(); scene.add(setupGroup);
@@ -1017,15 +1067,19 @@
     function homeRows(color) { return color === WHITE ? [0, 1] : [ROWS - 2, ROWS - 1]; }
     function isHomeCell(color, r, c) { return homeRows(color).indexOf(r) !== -1; }
     function standardFormationFor(color) {
-      var f = []; homeRows(color).forEach(function (r) { for (var c = 0; c < COLS; c++) f.push({ r: r, c: c }); });
-      return f; // 8 pawns, one per home cell
+      // one pawn per home cell, then stack the extras onto the back row (round-robin,
+      // back row first) so it scales with SETUP_N and stays mirror-symmetric per side.
+      var rows = color === WHITE ? [0, 1] : [ROWS - 1, ROWS - 2]; // back row first
+      var cells = []; rows.forEach(function (r) { for (var c = 0; c < COLS; c++) cells.push({ r: r, c: c }); });
+      var f = []; for (var i = 0; i < SETUP_N; i++) { var cell = cells[i % cells.length]; f.push({ r: cell.r, c: cell.c }); }
+      return f;
     }
     function randomFormationFor(color) {
       var cells = []; homeRows(color).forEach(function (r) { for (var c = 0; c < COLS; c++) cells.push({ r: r, c: c }); });
       var f = []; for (var i = 0; i < SETUP_N; i++) { var cell = cells[Math.floor(Math.random() * cells.length)]; f.push({ r: cell.r, c: cell.c }); }
       return f;
     }
-    function aiFormation(color) { return Math.random() < 0.5 ? standardFormationFor(color) : randomFormationFor(color); }
+    function aiFormation(color) { return randomFormationFor(color); }
 
     function clearSetupVisuals() {
       while (setupGroup.children.length) setupGroup.remove(setupGroup.children[0]);
@@ -1062,6 +1116,7 @@
     }
 
     function enterSetup() {
+      stopPlayout();
       if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
       phase = 'setup';
       hideWinOverlay();
