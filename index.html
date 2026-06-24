@@ -472,7 +472,7 @@
     // ====================================================================
     // RENDERING + INTERACTION
     // ====================================================================
-    var S = 1, DEPTH = 0.5, PAWN_H = 0.5, PAWN_R = 0.34, TILE_T = 0.06;
+    var S = 1.725, DEPTH = 0.5, PAWN_H = 0.5, PAWN_R = 0.6158, TILE_T = 0.06;
     var surfaceY = function (r) { return isTopRow(r) ? 0 : -DEPTH; };
     var worldX = function (c) { return (c - (COLS - 1) / 2) * S; };
     var worldZ = function (r) { return (r - (ROWS - 1) / 2) * S; };
@@ -493,16 +493,16 @@
 
     var scene = new THREE.Scene();
     scene.background = null;
-    scene.fog = new THREE.Fog(0x14161c, 16, 34); // gentle depth falloff
+    scene.fog = new THREE.Fog(0x14161c, 24, 51); // gentle depth falloff
 
     var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    camera.position.set(0, 7.5, 8.5);
+    camera.position.set(0, 11.25, 12.75);
 
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.target.set(0, -0.5, 0);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
     controls.maxPolarAngle = Math.PI / 2.05;
-    controls.minDistance = 5; controls.maxDistance = 20;
+    controls.minDistance = 7.5; controls.maxDistance = 30;
 
     scene.add(new THREE.HemisphereLight(0xfff4e2, 0x3a3326, 0.62)); // warm sky / earthy ground
     var sun = new THREE.DirectionalLight(0xfff0d0, 1.15);
@@ -510,7 +510,7 @@
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.radius = 4; sun.shadow.bias = -0.0005;
     var sc = sun.shadow.camera;
-    sc.left = -7; sc.right = 7; sc.top = 9; sc.bottom = -9; sc.near = 1; sc.far = 30;
+    sc.left = -10.5; sc.right = 10.5; sc.top = 13.5; sc.bottom = -13.5; sc.near = 1; sc.far = 45;
     scene.add(sun);
     var fill = new THREE.DirectionalLight(0xafc2ff, 0.22); // cool rim/fill for contrast
     fill.position.set(-6, 4, -5); scene.add(fill);
@@ -524,14 +524,20 @@
       m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true;
       boardGroup.add(m); return m;
     }
-    var plateauMat = woodMat(C_PLATEAU);
-    addBox(COLS * S, 1, 2 * S, 0, -0.5, worldZ(0.5), plateauMat);
-    addBox(COLS * S, 1, 2 * S, 0, -0.5, worldZ(5.5), plateauMat);
-    addBox(COLS * S, 1, 3 * S, 0, -DEPTH - 0.5, worldZ(3), woodMat(C_VALLEY));
-    addBox(COLS * S + 0.3, 0.4, ROWS * S + 0.3, 0, -1.7, 0, woodMat(0x3a2b1c), false);
+    // Butcher-block body: each cell drops a full-size column in its checker color so
+    // the SIDE faces read as a continuation of the checkered top (end-grain look).
+    // Every column is the SAME thickness, so the raised home rows sit higher with open
+    // space beneath them (rather than being filled solid down to a common floor).
+    var bodyLight = woodMat(C_LIGHT), bodyDark = woodMat(C_DARK);
+    var BODY_THICK = 1.0;
+    for (var br = 0; br < ROWS; br++) for (var bc = 0; bc < COLS; bc++) {
+      var topY = surfaceY(br);
+      addBox(S, BODY_THICK, S, worldX(bc), topY - BODY_THICK / 2, worldZ(br),
+        (br + bc) % 2 === 0 ? bodyLight : bodyDark);
+    }
     // capture trays either side
-    addBox(0.85, 0.18, 5.6, 3.4, -0.09, 0, woodMat(0x2e2114), false);
-    addBox(0.85, 0.18, 5.6, -3.4, -0.09, 0, woodMat(0x2e2114), false);
+    addBox(0.95, 0.18, 8.6, 5.1, -0.09, 0, woodMat(0x2e2114), false);
+    addBox(0.95, 0.18, 8.6, -5.1, -0.09, 0, woodMat(0x2e2114), false);
 
     var tileMatLight = woodMat(C_LIGHT), tileMatDark = woodMat(C_DARK);
     var tileGeo = new THREE.BoxGeometry(S * 0.96, TILE_T, S * 0.96);
@@ -545,10 +551,10 @@
     }
 
     // ---- Pawns ----
-    // Beveled "checker" disc (rounded top/bottom rim) via a lathe profile — softer
-    // and more premium-looking than a hard-edged cylinder.
+    // "Checker" disc with a SLIGHT chamfer at the top/bottom rim — just enough that a
+    // stack shows a seam between pawns so you can count them (not the old soft bevel).
     var pawnGeo = (function () {
-      var R = PAWN_R, h = PAWN_H / 2, b = Math.min(0.07, PAWN_H * 0.28);
+      var R = PAWN_R, h = PAWN_H / 2, b = 0.025;
       var pts = [
         new THREE.Vector2(0, -h),
         new THREE.Vector2(R - b, -h),
@@ -571,7 +577,7 @@
       mesh.castShadow = true; mesh.receiveShadow = true;
       var ring = new THREE.Mesh(
         new THREE.TorusGeometry(PAWN_R * 0.72, 0.03, 10, 32),
-        new THREE.MeshStandardMaterial({ color: piece.color === WHITE ? 0xd8c89a : 0x33302b, roughness: 0.6 })
+        new THREE.MeshStandardMaterial({ color: 0x4a463e, roughness: 0.6 })
       );
       ring.rotation.x = Math.PI / 2; ring.position.y = PAWN_H / 2 - 0.02; mesh.add(ring);
       mesh.userData = { id: piece.id, kind: 'pawn' };
@@ -658,7 +664,7 @@
         for (var i = 0; i < n; i++) {
           var mesh = new THREE.Mesh(pawnGeo, color === WHITE ? matWhite : matBlack);
           mesh.scale.set(0.5, 0.5, 0.5); mesh.castShadow = true;
-          mesh.position.set(color === WHITE ? 3.4 : -3.4, PAWN_H * 0.25, -2.4 + i * 0.62);
+          mesh.position.set(color === WHITE ? 5.1 : -5.1, PAWN_H * 0.25, -3.7 + i * 0.67);
           trayGroup.add(mesh);
         }
       }
@@ -742,9 +748,9 @@
 
     // ---- Camera presets ----
     var VIEWS = {
-      angle: { p: new THREE.Vector3(0, 7.5, 8.5), t: new THREE.Vector3(0, -0.5, 0) },
-      top: { p: new THREE.Vector3(0, 13.5, 0.01), t: new THREE.Vector3(0, -0.5, 0) },
-      side: { p: new THREE.Vector3(0, 3.2, 9.8), t: new THREE.Vector3(0, -0.6, 0) }
+      angle: { p: new THREE.Vector3(0, 11.25, 12.75), t: new THREE.Vector3(0, -0.5, 0) },
+      top: { p: new THREE.Vector3(0, 20.25, 0.015), t: new THREE.Vector3(0, -0.5, 0) },
+      side: { p: new THREE.Vector3(0, 4.8, 14.7), t: new THREE.Vector3(0, -0.6, 0) }
     };
     var camTween = null;
     function flyTo(name) {
@@ -908,6 +914,8 @@
     }
     function trySelectPawn(id) { var cell = findCellOfPiece(id); if (!cell) { deselect(); return; } trySelectAt(cell.r, cell.c); }
     function trySelectAt(rr, cc) {
+      // clicking the already-selected pawn toggles the selection off
+      if (selected && selected.r === rr && selected.c === cc) { deselect(); return; }
       var st = state.board[rr][cc];
       var top = st.length ? st[st.length - 1] : null;
       if (!top || top.color !== state.current) { deselect(); return; }
@@ -1097,7 +1105,7 @@
       });
       homeRows(setupColor).forEach(function (r) {
         for (var c = 0; c < COLS; c++) {
-          var ring = new THREE.Mesh(new THREE.RingGeometry(S * 0.30, S * 0.46, 22),
+          var ring = new THREE.Mesh(new THREE.RingGeometry(S * 0.21, S * 0.322, 22),
             new THREE.MeshBasicMaterial({ color: 0x36d66b, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
           ring.rotation.x = -Math.PI / 2;
           ring.position.set(worldX(c), surfaceY(r) + TILE_T + 0.02, worldZ(r));
